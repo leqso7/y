@@ -1,0 +1,22 @@
+{
+  "name": "ჯგუფების გენერატორი",
+  "short_name": "ჯგუფები",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4CAF50",
+  "screenshots": [
+    {
+      "src": "/screenshots/pc.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/screenshots/mob.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ]
+}

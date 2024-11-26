@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ადმინისტრატორის პანელი</title>
+    <meta charset="UTF-8">
+    
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getDatabase, ref, onValue, update, set, get, push } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAAFv9qvvt6QrV-WwUaBD8SS1eOZAhw-hE",
+            authDomain: "site-access-contro.firebaseapp.com",
+            databaseURL: "https://site-access-contro-default-rtdb.firebaseio.com",
+            projectId: "site-access-contro",
+            storageBucket: "site-access-contro.appspot.com",
+            messagingSenderId: "657592968002",
+            appId: "1:657592968002:web:763eb114220653f7addedb",
+            measurementId: "G-87RM2Z6F0S"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        // მოთხოვნების მომენა
+        const requestsRef = ref(database, 'accessRequests');
+        onValue(requestsRef, (snapshot) => {
+            const requests = snapshot.val();
+            const requestsList = document.getElementById('requestsList');
+            requestsList.innerHTML = '';
+
+            if (requests) {
+                Object.entries(requests).forEach(([key, request]) => {
+                    if (request.status === 'pending') {
+                        const requestElement = document.createElement('div');
+                        requestElement.className = 'request-item';
+                        requestElement.innerHTML = `
+                            <div class="request-info">
+                                <p>მოთხოვნის დრო: ${new Date(request.timestamp).toLocaleString('ka-GE')}</p>
+                                <p>უნიკალური კოდი: <strong>${request.uniqueCode}</strong></p>
+                                <p>სტატუსი: მოლოდინში</p>
+                            </div>
+                            <div class="request-buttons">
+                                <button onclick="approveRequest('${key}')" class="approve-button">
+                                    დასტური
+                                </button>
+                                <button onclick="deleteRequest('${key}')" class="delete-button">
+                                    წაშლა
+                                </button>
+                            </div>
+                        `;
+                        requestsList.appendChild(requestElement);
+                    }
+                });
+            }
+        });
+
+        // გლობალური ფუნქცია მოთხოვნის დასამტკიცებლდ
+        window.approveRequest = async function(requestId) {
+            try {
+                const requestRef = ref(database, `accessRequests/${requestId}`);
+                const snapshot = await get(requestRef);
+                const request = snapshot.val();
+                
+                if (request) {
+                    // პირდაპირ ვამატებთ მომხმარებელს
+                    const userRef = ref(database, `activeUsers/${request.uniqueCode}`);
+                    await set(userRef, {
+                        lastActive: Date.now(),
+                        blocked: false,
+                        approvedAt: Date.now()
+                    });
+                    
+                    // ვშლით მოთხოვნას
+                    await set(requestRef, null);
+                    
+                    alert('მომხმარებელი დამტკიცებულია');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('შეცდომა მოთხოვნის დამტკიცებისას');
+            }
+        }
+
+        // მავამატოთ წაშლის ფუნქცია
+        window.deleteRequest = async function(requestId) {
+            try {
+                if (confirm('ნამდვილად გსურთ მოთხოვნის წაშლა?')) {
+                    const requestRef = ref(database, `accessRequests/${requestId}`);
+                    await set(requestRef, null);
+                    alert('მოთხოვნა წაიშალა');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('შეცდომა მოთხოვნის წაშლისას');
+            }
+        }
+
+        // მოდიფიცირებული onValue ფუნქცია activeUsers-თვის
+        const activeUsersRef = ref(database, 'activeUsers');
+        onValue(activeUsersRef, (snapshot) => {
+            const activeUsers = snapshot.val();
+            const activeUsersList = document.getElementById('activeUsersList');
+            activeUsersList.innerHTML = '';
+
+            if (activeUsers) {
+                Object.entries(activeUsers).forEach(([uniqueCode, userData]) => {
+                    const userElement = document.createElement('div');
+                    userElement.className = 'user-item';
+                    userElement.innerHTML = `
+                        <div class="user-info">
+                            <p>უნიკალური კოდი: <strong>${uniqueCode}</strong></p>
+                            <p>ბოლო აქტივობა: ${new Date(userData.lastActive).toLocaleString('ka-GE')}</p>
+                            <p>სტატუსი: ${userData.blocked ? '🔴 დაბლოკილი' : '🟢 აქტიური'}</p>
+                        </div>
+                        <button onclick="toggleUserAccess('${uniqueCode}', ${!userData.blocked})" 
+                            class="${userData.blocked ? 'unblock-button' : 'block-button'}">
+                            ${userData.blocked ? 'წვდომის აღდგენა' : 'წვდომის გაუქმება'}
+                        </button>
+                    `;
+                    activeUsersList.appendChild(userElement);
+                });
+            }
+        });
+
+        // განახლებული toggleUserAccess ფუნქცია
+        window.toggleUserAccess = async function(uniqueCode, shouldBlock) {
+            try {
+                const userRef = ref(database, `activeUsers/${uniqueCode}`);
+                
+                // ჯერ წავშალოთ ძველი მონაცემები
+                if (shouldBlock) {
+                    await set(userRef, null);
+                    alert('მომხმარებელი დაიბლოკა');
+                    return;
+                }
+                
+                // თუ ვაბრუნებთ წვდომას
+                const userData = {
+                    lastActive: Date.now(),
+                    blocked: false,
+                    approvedAt: Date.now()
+                };
+                
+                await set(userRef, userData);
+                alert('მომხმარებლის წვდომა აღდგა');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('შეცდომა სტატუსის ცვლილებისას');
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .request-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .approve-button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .approve-button:hover {
+            background-color: #45a049;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+
+        .no-requests {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .section {
+            flex: 1;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+
+        .block-button {
+            padding: 10px 20px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .unblock-button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .block-button:hover {
+            background-color: #c82333;
+        }
+
+        .unblock-button:hover {
+            background-color: #218838;
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .request-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .delete-button {
+            padding: 10px 20px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .delete-button:hover {
+            background-color: #c82333;
+        }
+
+        .group-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .group-buttons button {
+            padding: 15px;
+            font-size: 16px;
+            width: 100%;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="section">
+            <h2>მოთხოვნების მართვა</h2>
+            <div id="requestsList"></div>
+        </div>
+        <div class="section">
+            <h2>აქტიური მომხმარებლები</h2>
+            <div id="activeUsersList"></div>
+        </div>
+    </div>
+
+    <script>
+        function showClassTemplateDialog() {
+            const dialog = document.createElement('div');
+            dialog.className = 'modal';
+            dialog.innerHTML = `
+                <div class="modal-content">
+                    <h2>აირჩიეთ დაჯგუფების მეთოდი</h2>
+                    <div class="group-buttons">
+                        <button onclick="handleGroupingChoice('perGroup')" id="perGroupButton">
+                            ${selectedNumber} კაციანი ჯგუფების გაკეთება
+                        </button>
+                        <button onclick="handleGroupingChoice('numberOfGroups')" id="numberOfGroupsButton">
+                            ${selectedNumber} ჯგუფის გაკეთება
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(dialog);
+        }
+
+        // ცვლადი არჩეული რიცხვის შესანახად
+        let selectedNumber = 0;
+
+        // განვაახლოთ groupSizeButtons-ის click ჰენდლერი
+        document.querySelectorAll('#groupSizeOptions button').forEach(button => {
+            button.addEventListener('click', function() {
+                selectedNumber = parseInt(this.textContent);
+                showClassTemplateDialog();
+            });
+        });
+    </script>
+</body>
+</html>
