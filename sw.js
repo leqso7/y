@@ -1,11 +1,12 @@
 const CACHE_NAME = 'group-generator-v1';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/request.html',
-  '/manifest.json',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png'
+  './',
+  './index.html',
+  './request.html',
+  './manifest.json',
+  './icons/s.png',
+  './screenshots/pc.png',
+  './screenshots/mob.png'
 ];
 
 self.addEventListener('install', event => {
